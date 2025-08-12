@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXAM यात्रा - Your Guide to Competitive Exams</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* A light gray background */
+        }
+        
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Animation for Chatbot loading dots */
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        .animate-bounce {
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .animate-bounce .h-2.w-2:nth-child(1) { animation-delay: -0.32s; }
+        .animate-bounce .h-2.w-2:nth-child(2) { animation-delay: -0.16s; }
+
+        /* Hide elements until ready to prevent flash of unstyled content */
+        .hidden-until-ready {
+            display: none;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-900">
+
+    <!-- App Container -->
+    <div id="app-container">
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="flex items-center justify-center min-h-screen bg-gray-100">
+            <div class="text-xl font-semibold text-gray-700">Loading EXAM यात्रा...</div>
+        </div>
+
+        <!-- Main App Structure (initially hidden) -->
+        <div id="main-app" class="hidden-until-ready">
+            <!-- Navigation Bar -->
+            <nav id="navbar" class="bg-indigo-700 p-4 shadow-lg sticky top-0 z-50">
+                <!-- Navbar content will be injected by JS -->
+            </nav>
+
+            <!-- Main Content Area -->
+            <main id="main-content">
+                <!-- Page content will be injected by JS -->
+            </main>
+
+            <!-- Footer -->
+            <footer id="footer" class="bg-gray-800 text-white py-8 px-4 sm:px-6 lg:px-8">
+                <!-- Footer content will be injected by JS -->
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-container"></div>
+
+    <!-- Chatbot Container -->
+    <div id="chatbot-container"></div>
+
+    <!-- Scroll to Top Button -->
+    <button id="scroll-to-top" class="hidden fixed bottom-20 right-4 p-3 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-110 z-40" aria-label="Scroll to top">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+    </button>
+
+    <!-- App Logic -->
+    <script>
+        // --- App State ---
+        let exams = [];
+        let savedExams = [];
+        let currentPage = 'home';
+        let selectedExamId = null;
+        let filterCategory = '';
+        let isMenuOpen = false;
+
+        // --- DOM Elements ---
+        const appContainer = document.getElementById('app-container');
+        const mainApp = document.getElementById('main-app');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const mainContent = document.getElementById('main-content');
+        const navbarContainer = document.getElementById('navbar');
+        const footerContainer = document.getElementById('footer');
+        const modalContainer = document.getElementById('modal-container');
+        const chatbotContainer = document.getElementById('chatbot-container');
+        const scrollToTopBtn = document.getElementById('scroll-to-top');
+
+        // --- Local Storage Functions ---
+        const getFromLocalStorage = (key, defaultValue) => {
+            try {
+                const storedValue = localStorage.getItem(key);
+                if (storedValue) {
+                    return JSON.parse(storedValue);
+                }
+            } catch (error) {
+                console.error("Error reading from local storage:", error);
+            }
+            return defaultValue;
+        };
+
+        const saveToLocalStorage = (key, value) => {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (error) {
+                console.error("Error saving to local storage:", error);
+            }
+        };
+        
+        // --- Utility Functions ---
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('en-IN', options);
+        };
+
+        const calculateCountdown = (dateString) => {
+            if (!dateString) return 'N/A';
+            const now = new Date();
+            const targetDate = new Date(dateString);
+            const diff = targetDate.getTime() - now.getTime();
+
+            if (diff <= 0) return 'Application Closed';
+
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            
+            return `${days}d ${hours}h left`;
+        };
+        
+        // --- Pre-populated Data ---
+        const getPrepopulatedExams = () => [
+          { id: 'ssc-cgl-2024', name: 'SSC CGL 2024', conductingBody: 'Staff Selection Commission (SSC)', eligibility: 'Bachelor\'s Degree from a recognized University or equivalent. Age: 18-32 years.', syllabus: 'Tier-I: General Intelligence & Reasoning, General Awareness, Quantitative Aptitude, English Comprehension.\nTier-II: Quantitative Abilities, English Language and Comprehension, Statistics, General Studies (Finance & Economics).', selectionProcess: 'Tier-I (Computer Based Examination), Tier-II (Computer Based Examination), Document Verification.', lastDateToApply: '2025-09-15', applicationLink: 'https://ssc.nic.in/portal/apply', officialWebsite: 'https://ssc.nic.in/', category: 'Govt Jobs', qualification: 'Graduate', applicationFees: 100, faqs: 'Q: What is the age limit for SSC CGL?\nA: Generally 18-32 years, varies by post.\nQ: Is there negative marking in SSC CGL?\nA: Yes, 0.50 marks in Tier-I and 1 mark in Tier-II for each wrong answer.', createdAt: '2025-07-01T10:00:00Z' },
+          { id: 'neet-ug-2025', name: 'NEET UG 2025', conductingBody: 'National Testing Agency (NTA)', eligibility: '10+2 with Physics, Chemistry, Biology/Biotechnology & English. Minimum age 17 years as of Dec 31, 2025.', syllabus: 'Physics, Chemistry, and Biology (Botany & Zoology) based on Class 11th and 12th syllabus.', selectionProcess: 'Single entrance examination (NEET UG) followed by counseling for MBBS/BDS admissions.', lastDateToApply: '2025-10-20', applicationLink: 'https://neet.nta.nic.in/apply', officialWebsite: 'https://neet.nta.nic.in/', category: 'Medical', qualification: '12th Pass', applicationFees: 1600, faqs: 'Q: What is the maximum age limit for NEET UG?\nA: There is no upper age limit for NEET UG.\nQ: Can I appear for NEET if I am a dropper?\nA: Yes, repeaters are allowed to appear for NEET UG.', createdAt: '2025-07-15T11:30:00Z' },
+          { id: 'jee-main-2025', name: 'JEE Main 2025', conductingBody: 'National Testing Agency (NTA)', eligibility: '10+2 with Physics, Chemistry, and Mathematics. No age limit.', syllabus: 'Physics, Chemistry, and Mathematics based on Class 11th and 12th syllabus.', selectionProcess: 'JEE Main Paper 1 (B.E./B.Tech) and Paper 2 (B.Arch/B.Planning). Top scorers qualify for JEE Advanced.', lastDateToApply: '2025-11-05', applicationLink: 'https://jeemain.nta.nic.in/apply', officialWebsite: 'https://jeemain.nta.nic.in/', category: 'Engineering', qualification: '12th Pass', applicationFees: 1000, faqs: 'Q: How many attempts are allowed for JEE Main?\nA: Candidates can appear for JEE Main for three consecutive years.\nQ: Is JEE Main conducted online or offline?\nA: JEE Main is conducted online (Computer Based Test).', createdAt: '2025-07-20T09:00:00Z' },
+          { id: 'ibps-po-2024', name: 'IBPS PO 2024', conductingBody: 'Institute of Banking Personnel Selection (IBPS)', eligibility: 'Bachelor\'s Degree in any discipline from a recognized University. Age: 20-30 years.', syllabus: 'Prelims: English Language, Quantitative Aptitude, Reasoning Ability.\nMains: Reasoning & Computer Aptitude, General/ Economy/ Banking Awareness, English Language, Data Analysis & Interpretation.', selectionProcess: 'Prelims Exam, Mains Exam, Interview.', lastDateToApply: '2025-08-30', applicationLink: 'https://www.ibps.in/apply-online/', officialWebsite: 'https://www.ibps.in/', category: 'Banking', qualification: 'Graduate', applicationFees: 850, faqs: 'Q: Is there sectional cut-off in IBPS PO?\nA: Yes, candidates must clear sectional as well as overall cut-offs.\nQ: Can final year students apply for IBPS PO?\nA: No, candidates must have a valid degree on the date of online registration.', createdAt: '2025-06-25T14:00:00Z' },
+          { id: 'upsc-cse-2025', name: 'UPSC Civil Services Exam 2025', conductingBody: 'Union Public Service Commission (UPSC)', eligibility: 'Bachelor\'s degree from a recognized University. Age: 21-32 years.', syllabus: 'Prelims: General Studies Paper-I, CSAT Paper-II.\nMains: Essay, General Studies Papers (I, II, III, IV), Optional Subjects, Language Papers.', selectionProcess: 'Prelims Exam, Mains Exam, Personality Test (Interview).', lastDateToApply: '2025-12-10', applicationLink: 'https://upsconline.nic.in/upsc/mainmenu2.php', officialWebsite: 'https://upsc.gov.in/', category: 'Govt Jobs', qualification: 'Graduate', applicationFees: 100, faqs: 'Q: How many attempts are allowed for UPSC CSE?\nA: General category: 6 attempts; OBC: 9 attempts; SC/ST: Unlimited attempts.\nQ: Is CSAT qualifying in nature?\nA: Yes, CSAT (Paper-II) is a qualifying paper with minimum 33% marks.', createdAt: '2025-08-01T16:00:00Z' },
+        ];
+
+        // --- Modal Component ---
+        const renderModal = (title, message, type = 'alert', onConfirmCallback = null) => {
+            const confirmButtonText = type === 'confirm' ? 'Confirm' : 'OK';
+            const cancelButtonHTML = type === 'confirm' ? `<button id="modal-cancel" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-200">Cancel</button>` : '';
+
+            modalContainer.innerHTML = `
+                <div class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm transform transition-all scale-100">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">${title}</h3>
+                        <p class="text-gray-700 mb-6">${message}</p>
+                        <div class="flex justify-end space-x-3">
+                            ${cancelButtonHTML}
+                            <button id="modal-confirm" class="px-4 py-2 ${type === 'confirm' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition duration-200">${confirmButtonText}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modal-confirm').addEventListener('click', () => {
+                modalContainer.innerHTML = '';
+                if (onConfirmCallback) onConfirmCallback();
+            });
+
+            if (type === 'confirm') {
+                document.getElementById('modal-cancel').addEventListener('click', () => {
+                    modalContainer.innerHTML = '';
+                });
+            }
+        };
+        const showAlert = (title, message) => renderModal(title, message, 'alert');
+        const showConfirm = (title, message, onConfirm) => renderModal(title, message, 'confirm', onConfirm);
+        
+        // --- Chatbot Component ---
+        const renderChatbot = () => {
+            let isChatOpen = false;
+            let chatMessages = getFromLocalStorage('chatHistory', []);
+            let isBotLoading = false;
+
+            const getBotResponse = (userMessage) => {
+                isBotLoading = true;
+                updateChatUI();
+                
+                const lowerCaseMessage = userMessage.toLowerCase();
+                let botMessage = "I'm sorry, I don't have information about that. I can answer questions about specific exams, their syllabus, last dates, and eligibility. Try asking 'What is the syllabus for SSC CGL?' or 'Show me banking exams'.";
+
+                // Find a matching exam
+                const mentionedExam = exams.find(exam => lowerCaseMessage.includes(exam.name.toLowerCase()));
+
+                if (mentionedExam) {
+                    // Keyword checks for the specific exam
+                    if (lowerCaseMessage.includes('syllabus')) {
+                        botMessage = `The syllabus for ${mentionedExam.name} is: ${mentionedExam.syllabus || 'Not available.'}`;
+                    } else if (lowerCaseMessage.includes('eligibility') || lowerCaseMessage.includes('eligible')) {
+                        botMessage = `Eligibility for ${mentionedExam.name} is: ${mentionedExam.eligibility || 'Not available.'}`;
+                    } else if (lowerCaseMessage.includes('last date') || lowerCaseMessage.includes('deadline')) {
+                        botMessage = `The last date to apply for ${mentionedExam.name} is ${formatDate(mentionedExam.lastDateToApply)}.`;
+                    } else if (lowerCaseMessage.includes('website')) {
+                        botMessage = `You can find more info on the official website for ${mentionedExam.name} here: <a href="${mentionedExam.officialWebsite}" target="_blank" class="text-blue-600 underline">${mentionedExam.officialWebsite}</a>`;
+                    } else {
+                        botMessage = `I have information about ${mentionedExam.name}. What would you like to know? You can ask about its syllabus, eligibility, or last date to apply.`;
+                    }
+                } else {
+                    // General queries
+                    const categories = [...new Set(exams.map(exam => exam.category.toLowerCase()))];
+                    const mentionedCategory = categories.find(cat => lowerCaseMessage.includes(cat));
+
+                    if (mentionedCategory) {
+                        const categoryExams = exams.filter(exam => exam.category.toLowerCase() === mentionedCategory);
+                        const examNames = categoryExams.map(e => e.name).join(', ');
+                        botMessage = `Sure! Here are some exams in the ${mentionedCategory} category: ${examNames}. You can ask me for more details on any of these.`;
+                    } else if (lowerCaseMessage.includes('hello') || lowerCaseMessage.includes('hi') || lowerCaseMessage.includes('namaste')) {
+                        botMessage = "Namaste! How can I help you with your exam preparation today?";
+                    } else if (lowerCaseMessage.includes('thank')) {
+                        botMessage = "You're welcome! Let me know if you need anything else.";
+                    }
+                }
+
+                // Simulate thinking
+                setTimeout(() => {
+                    isBotLoading = false;
+                    chatMessages.push({ sender: 'bot', text: botMessage });
+                    saveToLocalStorage('chatHistory', chatMessages);
+                    updateChatUI();
+                }, 800);
+            };
+
+            const handleSendMessage = (e) => {
+                e.preventDefault();
+                const input = document.getElementById('chatbot-input');
+                const trimmedInput = input.value.trim();
+                if (!trimmedInput || isBotLoading) return;
+                
+                chatMessages.push({ sender: 'user', text: trimmedInput });
+                saveToLocalStorage('chatHistory', chatMessages);
+                getBotResponse(trimmedInput);
+                input.value = '';
+                updateChatUI();
+            };
+
+            const toggleChat = () => {
+                isChatOpen = !isChatOpen;
+                if (isChatOpen && chatMessages.length === 0) {
+                    chatMessages.push({ sender: 'bot', text: "Namaste! I'm Yatri, your AI assistant. How can I help you with your exam journey today?" });
+                    saveToLocalStorage('chatHistory', chatMessages);
+                }
+                updateChatUI();
+            };
+
+            const updateChatUI = () => {
+                const messagesHTML = chatMessages.map(msg => `
+                    <div class="flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-xs md:max-w-md p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}">
+                            <p>${msg.text}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+                const loadingIndicatorHTML = isBotLoading ? `
+                    <div class="flex justify-start">
+                        <div class="p-3 rounded-2xl bg-gray-200 text-gray-800 rounded-bl-none">
+                            <div class="flex items-center space-x-1 animate-bounce">
+                                <span class="h-2 w-2 bg-gray-400 rounded-full"></span>
+                                <span class="h-2 w-2 bg-gray-400 rounded-full"></span>
+                                <span class="h-2 w-2 bg-gray-400 rounded-full"></span>
+                            </div>
+                        </div>
+                    </div>` : '';
+
+                chatbotContainer.innerHTML = `
+                    <div class="fixed bottom-24 right-4 sm:right-6 w-full max-w-sm h-[70vh] bg-white rounded-2xl shadow-2xl flex flex-col transition-transform duration-300 ease-in-out z-50 ${isChatOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}">
+                        <div class="bg-indigo-600 text-white p-4 rounded-t-2xl flex justify-between items-center shadow-md">
+                            <h3 class="font-bold text-lg">Yatri Assistant</h3>
+                            <button id="close-chat-btn" class="text-white hover:text-indigo-200" aria-label="Close chat">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4">
+                            ${messagesHTML}
+                            ${loadingIndicatorHTML}
+                        </div>
+                        <form id="chatbot-form" class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
+                            <div class="flex items-center space-x-2">
+                                <input type="text" id="chatbot-input" placeholder="Ask about an exam..." class="w-full p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500" ${isBotLoading ? 'disabled' : ''}>
+                                <button type="submit" class="bg-indigo-600 text-white p-3 rounded-full hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors" ${isBotLoading ? 'disabled' : ''}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="fixed bottom-4 right-4 z-40">
+                        <button id="toggle-chat-btn" class="bg-indigo-600 text-white rounded-full p-4 shadow-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-110 flex items-center justify-center" aria-label="${isChatOpen ? "Close Chatbot" : "Open Chatbot"}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                        </button>
+                    </div>
+                `;
+
+                document.getElementById('toggle-chat-btn').onclick = toggleChat;
+                document.getElementById('close-chat-btn').onclick = toggleChat;
+                document.getElementById('chatbot-form').onsubmit = handleSendMessage;
+                
+                const messagesDiv = document.getElementById('chat-messages');
+                if (messagesDiv) messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            };
+            
+            updateChatUI();
+        };
+
+        // --- Rendering Functions ---
+        const renderNavbar = () => {
+            const navLinks = [
+                { id: 'home', text: 'Home' },
+                { id: 'examCalendar', text: 'Calendar' },
+                { id: 'categories', text: 'Categories' },
+                { id: 'mySavedExams', text: 'My Saved Exams' },
+                { id: 'addExam', text: 'Add Exam' },
+                { id: 'contact', text: 'Contact' },
+            ];
+
+            const linksHTML = navLinks.map(link => `
+                <button data-page="${link.id}" class="nav-link w-full text-left md:w-auto px-3 py-2 rounded-lg text-sm sm:text-base font-medium transition duration-300 ease-in-out ${currentPage === link.id ? 'bg-indigo-500 text-white shadow-md' : 'text-indigo-100 hover:bg-indigo-600'}">
+                    ${link.text}
+                </button>
+            `).join('');
+
+            navbarContainer.innerHTML = `
+                <div class="container mx-auto flex justify-between items-center">
+                    <div class="flex items-center space-x-3 cursor-pointer" data-page="home">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 2a8 8 0 100 16 8 8 0 000-16zM12 6a6 6 0 110 12 6 6 0 010-12zm0 2a4 4 0 100 8 4 4 0 000-8zm0 2a2 2 0 110 4 2 2 0 010-4z" fill="#FFD700"/><path d="M12 10l-2 2h4l-2-2z" fill="#FFFFFF"/><path d="M12 14l2-2h-4l2 2z" fill="#FFFFFF"/><path d="M12 8l-1 1h2l-1-1z" fill="#FFFFFF"/><path d="M12 16l1-1h-2l1 1z" fill="#FFFFFF"/><path d="M12 2.5V4m0 16v1.5M2.5 12H4m16 0h1.5" stroke="#FFD700" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <div class="text-white text-2xl font-bold tracking-wide">EXAM यात्रा</div>
+                    </div>
+                    <div class="md:hidden">
+                        <button id="menu-toggle-btn" class="text-white focus:outline-none">
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                ${isMenuOpen ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />' : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />'}
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="nav-links-container" class="${isMenuOpen ? 'block' : 'hidden'} absolute md:relative top-full left-0 md:top-auto md:left-auto bg-indigo-700 md:bg-transparent w-full md:w-auto md:flex flex-col md:flex-row md:space-x-4 mt-4 md:mt-0 p-4 md:p-0">
+                        ${linksHTML}
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderFooter = () => {
+            footerContainer.innerHTML = `
+                <div class="container mx-auto text-center">
+                    <h3 class="text-xl font-bold mb-4">EXAM यात्रा</h3>
+                    <p class="text-gray-400 mb-6">Your ultimate guide to competitive exams.</p>
+                    <p class="text-gray-500 text-sm">&copy; ${new Date().getFullYear()} EXAM यात्रा. All rights reserved.</p>
+                </div>
+            `;
+        };
+
+        const renderHomePage = () => {
+            const topExams = exams.filter(exam => ['ssc-cgl-2024', 'neet-ug-2025', 'jee-main-2025', 'ibps-po-2024', 'upsc-cse-2025'].includes(exam.id)).slice(0, 5);
+            
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+                    <h1 class="text-3xl sm:text-4xl font-extrabold text-center text-gray-800 mb-8">
+                        Welcome to <span class="text-indigo-600">EXAM यात्रा</span>
+                    </h1>
+                    
+                    <!-- Search & Filters -->
+                    <div class="mb-8 p-4 bg-white rounded-xl shadow-lg">
+                        <div class="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3">
+                            <input type="text" id="search-term" placeholder="Search for exams..." class="flex-grow p-2 text-gray-700 border rounded-lg focus:ring-2 focus:ring-indigo-400 w-full">
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <select id="qualification-filter" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                <option value="">All Qualifications</option>
+                                <option value="12th Pass">12th Pass</option>
+                                <option value="Graduate">Graduate</option>
+                            </select>
+                            <select id="category-filter" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                <option value="">All Categories</option>
+                                <option value="Govt Jobs">Govt Jobs</option>
+                                <option value="Medical">Medical</option>
+                                <option value="Engineering">Engineering</option>
+                                <option value="Banking">Banking</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Top Exams -->
+                    <div class="mb-8 p-4 bg-white rounded-xl shadow-lg">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Top Exams Quick Access</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                            ${topExams.map(exam => `<button data-exam-id="${exam.id}" class="exam-details-btn bg-purple-100 text-purple-800 py-3 px-4 rounded-lg shadow-md hover:bg-purple-200 transition">${exam.name}</button>`).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Filtered Exam List -->
+                    <div id="exam-list-container" class="p-4 bg-white rounded-xl shadow-lg">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Available Exams</h2>
+                        <div id="exam-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <!-- Exam cards will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            `;
+            renderFilteredExams(); // Initial render
+        };
+        
+        const renderFilteredExams = () => {
+            const searchTerm = document.getElementById('search-term')?.value.toLowerCase() || '';
+            const qualification = document.getElementById('qualification-filter')?.value || '';
+            const categoryFilterElement = document.getElementById('category-filter');
+            // Use the filterCategory state if it's set, otherwise use the dropdown value
+            const category = filterCategory || (categoryFilterElement ? categoryFilterElement.value : '');
+            
+            if (categoryFilterElement && filterCategory) {
+                categoryFilterElement.value = filterCategory;
+            }
+
+            const filteredExams = exams.filter(exam => 
+                (exam.name.toLowerCase().includes(searchTerm) || exam.conductingBody.toLowerCase().includes(searchTerm)) &&
+                (!qualification || exam.qualification === qualification) &&
+                (!category || exam.category === category)
+            );
+
+            const examListContainer = document.getElementById('exam-list');
+            if (!examListContainer) return;
+
+            if (filteredExams.length === 0) {
+                examListContainer.innerHTML = `<p class="text-gray-600 italic col-span-full">No exams found matching your criteria.</p>`;
+                return;
+            }
+
+            examListContainer.innerHTML = filteredExams.map(exam => `
+                <div class="bg-gray-50 p-5 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">${exam.name}</h3>
+                    <p class="text-gray-600"><strong>Body:</strong> ${exam.conductingBody}</p>
+                    <p class="text-gray-600"><strong>Category:</strong> ${exam.category}</p>
+                    <p class="text-gray-600"><strong>Last Date:</strong> ${formatDate(exam.lastDateToApply)}</p>
+                    <div class="mt-4">
+                        <button data-exam-id="${exam.id}" class="exam-details-btn w-full bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-md transition">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        const renderExamInfoPage = () => {
+            const exam = exams.find(e => e.id === selectedExamId);
+            if (!exam) {
+                mainContent.innerHTML = `<div class="p-8 text-center text-red-600">Exam not found.</div>`;
+                return;
+            }
+            
+            const isBookmarked = savedExams.includes(exam.id);
+            const faqsArray = exam.faqs ? exam.faqs.split(/\r?\n/).filter(line => line.trim() !== '') : [];
+            const parsedFaqs = [];
+            for (let i = 0; i < faqsArray.length; i++) {
+                if (faqsArray[i].startsWith('Q:')) {
+                    const question = faqsArray[i].substring(2).trim();
+                    let answer = (faqsArray[i+1] && faqsArray[i+1].startsWith('A:')) ? faqsArray[i+1].substring(2).trim() : '';
+                    parsedFaqs.push({ question, answer });
+                    i++;
+                }
+            }
+
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+                    <button data-page="home" class="nav-link mb-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                        Back to Home
+                    </button>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div id="pdf-content" class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                            <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800 mb-6">${exam.name}</h1>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Exam Overview</h2>
+                            <ul class="space-y-3 text-gray-700 text-lg">
+                                <li><strong>Conducting Body:</strong> ${exam.conductingBody}</li>
+                                <li><strong>Eligibility:</strong> ${exam.eligibility || 'N/A'}</li>
+                                <li><strong>Selection Process:</strong> ${exam.selectionProcess || 'N/A'}</li>
+                                <li><strong>Last Date:</strong> <span class="font-semibold text-red-600">${formatDate(exam.lastDateToApply)}</span></li>
+                                <li><strong>Countdown:</strong> <span class="font-semibold text-blue-600">${calculateCountdown(exam.lastDateToApply)}</span></li>
+                            </ul>
+                            <h3 class="text-xl font-bold text-gray-800 mt-6 mb-3">Syllabus</h3>
+                            <p class="text-gray-700 whitespace-pre-wrap">${exam.syllabus || 'Not available.'}</p>
+                            
+                            <h3 class="text-xl font-bold text-gray-800 mt-6 mb-3">FAQs</h3>
+                            <div class="space-y-4">
+                                ${parsedFaqs.map((faq, index) => `
+                                    <details class="border border-gray-200 rounded-lg">
+                                        <summary class="flex justify-between items-center w-full p-4 text-left font-semibold text-gray-800 bg-gray-50 hover:bg-gray-100 cursor-pointer">
+                                            <span>${faq.question}</span>
+                                            <span class="text-xl">+</span>
+                                        </summary>
+                                        <div class="p-4 text-gray-700 bg-white">${faq.answer}</div>
+                                    </details>
+                                `).join('') || '<p class="text-gray-700">No FAQs available.</p>'}
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-1 space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-500">
+                                <h3 class="text-2xl font-bold text-red-700 mb-4">Apply Now!</h3>
+                                <a href="${exam.applicationLink}" target="_blank" rel="noopener noreferrer" class="block text-center px-6 py-3 bg-red-600 text-white font-bold text-lg rounded-lg shadow-lg hover:bg-red-700 transition">Apply Now</a>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-lg">
+                                <button id="bookmark-btn" class="w-full px-6 py-3 font-bold text-lg rounded-lg shadow-md transition ${isBookmarked ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-800'}">
+                                    ${isBookmarked ? 'Remove Bookmark' : 'Bookmark Exam'}
+                                </button>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-lg">
+                                <button id="download-pdf-btn" class="w-full px-6 py-3 font-bold text-lg rounded-lg shadow-md transition bg-cyan-500 text-white hover:bg-cyan-600">
+                                    Download Info as PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderMySavedExamsPage = () => {
+            if (savedExams.length === 0) {
+                mainContent.innerHTML = `
+                    <div class="p-4 sm:p-6 lg:p-8 bg-purple-50 min-h-screen">
+                        <h1 class="text-3xl font-bold text-purple-800 mb-6">My Saved Exams</h1>
+                        <p class="text-gray-600 italic">You haven't saved any exams yet.</p>
+                    </div>`;
+                return;
+            }
+            
+            const savedExamsHTML = savedExams.map(savedId => {
+                const fullExam = exams.find(e => e.id === savedId);
+                if (!fullExam) return '';
+                return `
+                    <div class="bg-white p-5 rounded-xl shadow-lg border border-purple-200">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">${fullExam.name}</h3>
+                        <p class="text-gray-600"><strong>Body:</strong> ${fullExam.conductingBody}</p>
+                        <div class="flex space-x-2 mt-4">
+                            <button data-exam-id="${fullExam.id}" class="exam-details-btn flex-1 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg">View</button>
+                            <button data-saved-id="${fullExam.id}" data-exam-name="${fullExam.name}" class="remove-saved-btn flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Remove</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-purple-50 min-h-screen">
+                    <h1 class="text-3xl font-bold text-purple-800 mb-6">My Saved Exams</h1>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        ${savedExamsHTML}
+                    </div>
+                </div>
+            `;
+        };
+        
+        const renderAddExamPage = () => {
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-blue-50 min-h-screen">
+                    <h1 class="text-3xl font-bold text-blue-800 mb-6">Add New Exam</h1>
+                    <form id="add-exam-form" class="bg-white p-6 rounded-xl shadow-lg max-w-2xl mx-auto space-y-4">
+                        <div>
+                            <label for="name" class="block text-gray-700 font-bold mb-2">Exam Name:</label>
+                            <input type="text" id="name" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700" required>
+                        </div>
+                        <div>
+                            <label for="conductingBody" class="block text-gray-700 font-bold mb-2">Conducting Body:</label>
+                            <input type="text" id="conductingBody" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700" required>
+                        </div>
+                        <div>
+                            <label for="category" class="block text-gray-700 font-bold mb-2">Category:</label>
+                            <input type="text" id="category" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700" required>
+                        </div>
+                        <div>
+                            <label for="lastDateToApply" class="block text-gray-700 font-bold mb-2">Last Date to Apply:</label>
+                            <input type="date" id="lastDateToApply" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700" required>
+                        </div>
+                        <div>
+                            <label for="applicationLink" class="block text-gray-700 font-bold mb-2">Apply Link:</label>
+                            <input type="url" id="applicationLink" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Add Exam</button>
+                    </form>
+                </div>
+            `;
+        };
+        
+        const renderExamCalendarPage = () => {
+            const examsByMonth = exams.reduce((acc, exam) => {
+                if (exam.lastDateToApply) {
+                    const month = new Date(exam.lastDateToApply).toLocaleString('default', { month: 'long', year: 'numeric' });
+                    if (!acc[month]) {
+                        acc[month] = [];
+                    }
+                    acc[month].push(exam);
+                }
+                return acc;
+            }, {});
+
+            const sortedMonths = Object.keys(examsByMonth).sort((a, b) => new Date(a) - new Date(b));
+
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-green-50 min-h-screen">
+                    <h1 class="text-3xl font-bold text-green-800 mb-6">Exam Calendar</h1>
+                    <div class="space-y-8">
+                        ${sortedMonths.length > 0 ? sortedMonths.map(month => `
+                            <div>
+                                <h2 class="text-2xl font-semibold text-gray-700 mb-4">${month}</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    ${examsByMonth[month].map(exam => `
+                                        <div class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-green-500">
+                                            <h3 class="text-lg font-semibold text-gray-800">${exam.name}</h3>
+                                            <p class="text-red-600 font-medium">Deadline: ${formatDate(exam.lastDateToApply)}</p>
+                                            <button data-exam-id="${exam.id}" class="exam-details-btn mt-3 w-full text-sm bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md">View Details</button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('') : '<p class="text-gray-600 italic">No exams with deadlines found.</p>'}
+                    </div>
+                </div>
+            `;
+        };
+        
+        const renderCategoriesPage = () => {
+            const categories = [...new Set(exams.map(exam => exam.category))].sort();
+            const colors = ['bg-red-100 text-red-800', 'bg-blue-100 text-blue-800', 'bg-green-100 text-green-800', 'bg-yellow-100 text-yellow-800', 'bg-purple-100 text-purple-800', 'bg-pink-100 text-pink-800'];
+
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-yellow-50 min-h-screen">
+                    <h1 class="text-3xl font-bold text-yellow-800 mb-6">Browse by Category</h1>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        ${categories.map((cat, index) => `
+                            <button data-category="${cat}" class="category-btn p-6 rounded-xl shadow-md text-center font-bold text-lg transition transform hover:scale-105 ${colors[index % colors.length]}">
+                                ${cat}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderContactPage = () => {
+            mainContent.innerHTML = `
+                <div class="p-4 sm:p-6 lg:p-8 bg-gray-100 min-h-screen">
+                    <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+                        <h1 class="text-3xl font-bold text-gray-800 mb-6">Contact Us</h1>
+                        <p class="text-gray-700 mb-4">
+                            Have questions or feedback? We'd love to hear from you.
+                        </p>
+                        <div class="space-y-4">
+                            <p><strong>Email:</strong> <a href="mailto:contact@exam-yatra.com" class="text-indigo-600 hover:underline">contact@exam-yatra.com</a></p>
+                            <p><strong>Location:</strong> Kolhapur, Maharashtra, India</p>
+                            <p class="text-sm text-gray-500 mt-6">Please note: This is a demo application. The contact information is for illustrative purposes only.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+        
+        // --- Page Navigation and Rendering Orchestration ---
+        const renderApp = () => {
+            renderNavbar();
+            renderFooter();
+            renderChatbot();
+
+            switch(currentPage) {
+                case 'home':
+                    renderHomePage();
+                    break;
+                case 'examInfo':
+                    renderExamInfoPage();
+                    break;
+                case 'mySavedExams':
+                    renderMySavedExamsPage();
+                    break;
+                case 'addExam':
+                    renderAddExamPage();
+                    break;
+                case 'examCalendar':
+                    renderExamCalendarPage();
+                    break;
+                case 'categories':
+                    renderCategoriesPage();
+                    break;
+                case 'contact':
+                    renderContactPage();
+                    break;
+                default:
+                    renderHomePage();
+            }
+        };
+
+        // --- Event Handlers ---
+        const handleNavigation = (page, data = null) => {
+            currentPage = page;
+            isMenuOpen = false;
+            
+            if (page === 'home') {
+                filterCategory = data || ''; // data here would be the category from the categories page
+            } else {
+                filterCategory = ''; // Reset filter for other pages
+            }
+
+            if (page === 'examInfo') {
+                selectedExamId = data; // data here is the examId
+            }
+
+            window.scrollTo(0, 0);
+            renderApp();
+        };
+
+        const handleBookmarkToggle = () => {
+            if (!selectedExamId) return;
+            const exam = exams.find(e => e.id === selectedExamId);
+            if (!exam) return;
+
+            const isBookmarked = savedExams.includes(exam.id);
+
+            if (isBookmarked) {
+                showConfirm('Remove Bookmark', `Remove "${exam.name}" from saved exams?`, () => {
+                    savedExams = savedExams.filter(id => id !== exam.id);
+                    saveToLocalStorage('savedExams', savedExams);
+                    showAlert('Removed!', `"${exam.name}" has been removed.`);
+                    renderApp(); // Re-render to update button
+                });
+            } else {
+                savedExams.push(exam.id);
+                saveToLocalStorage('savedExams', savedExams);
+                showAlert('Bookmarked!', `"${exam.name}" has been saved.`);
+                renderApp(); // Re-render to update button
+            }
+        };
+        
+        const handleRemoveSavedExam = (savedExamId, examName) => {
+            showConfirm('Remove Saved Exam', `Are you sure you want to remove "${examName}"?`, () => {
+                savedExams = savedExams.filter(id => id !== savedExamId);
+                saveToLocalStorage('savedExams', savedExams);
+                showAlert('Removed!', `"${examName}" has been removed.`);
+                renderApp(); // Re-render the saved exams page
+            });
+        };
+
+        const handleAddExamSubmit = (e) => {
+            e.preventDefault();
+            const newExam = {
+                id: `custom-${Date.now()}`, // Unique ID for the new exam
+                name: document.getElementById('name').value,
+                conductingBody: document.getElementById('conductingBody').value,
+                category: document.getElementById('category').value,
+                lastDateToApply: document.getElementById('lastDateToApply').value,
+                applicationLink: document.getElementById('applicationLink').value,
+                eligibility: 'N/A',
+                syllabus: 'N/A',
+                selectionProcess: 'N/A',
+                faqs: '',
+                qualification: 'N/A', // Or could add a field for this
+                createdAt: new Date().toISOString(),
+            };
+
+            if (!newExam.name || !newExam.lastDateToApply) {
+                showAlert('Missing Info', 'Please fill in at least Exam Name and Last Date.');
+                return;
+            }
+
+            exams.push(newExam);
+            // Re-sort exams after adding a new one
+            exams.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            saveToLocalStorage('exams', exams);
+            showAlert('Success!', 'Exam added successfully!');
+            e.target.reset();
+            handleNavigation('home');
+        };
+
+        const handleDownloadPdf = () => {
+            const element = document.getElementById('pdf-content');
+            const exam = exams.find(e => e.id === selectedExamId);
+            if (element && exam && window.html2pdf) {
+                const opt = {
+                    margin: 0.5,
+                    filename: `${exam.name.replace(/\s/g, '-')}-info.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                window.html2pdf().set(opt).from(element).save();
+            } else {
+                showAlert('PDF Error', 'Could not generate PDF.');
+            }
+        };
+
+        // --- Global Event Listener (Event Delegation) ---
+        document.body.addEventListener('click', (e) => {
+            // Navbar links
+            const navLink = e.target.closest('.nav-link');
+            if (navLink) {
+                e.preventDefault();
+                handleNavigation(navLink.dataset.page);
+            }
+            
+            // Logo click
+            if (e.target.closest('[data-page="home"]')) {
+                handleNavigation('home');
+            }
+
+            // View exam details button
+            const detailsBtn = e.target.closest('.exam-details-btn');
+            if (detailsBtn) {
+                handleNavigation('examInfo', detailsBtn.dataset.examId);
+            }
+            
+            // Category button on categories page
+            const categoryBtn = e.target.closest('.category-btn');
+            if (categoryBtn) {
+                handleNavigation('home', categoryBtn.dataset.category);
+            }
+
+            // Bookmark button
+            if (e.target.closest('#bookmark-btn')) {
+                handleBookmarkToggle();
+            }
+            
+            // Remove saved exam button
+            const removeSavedBtn = e.target.closest('.remove-saved-btn');
+            if (removeSavedBtn) {
+                handleRemoveSavedExam(removeSavedBtn.dataset.savedId, removeSavedBtn.dataset.examName);
+            }
+            
+            // Download PDF button
+            if (e.target.closest('#download-pdf-btn')) {
+                handleDownloadPdf();
+            }
+
+            // Hamburger menu toggle
+            if (e.target.closest('#menu-toggle-btn')) {
+                isMenuOpen = !isMenuOpen;
+                renderNavbar(); // Re-render navbar to show/hide menu
+            }
+        });
+        
+        document.body.addEventListener('input', (e) => {
+            // Filters on home page
+            if (e.target.id === 'search-term' || e.target.id === 'qualification-filter' || e.target.id === 'category-filter') {
+                if(currentPage === 'home') {
+                    filterCategory = ''; // Clear programmatic filter if user interacts with dropdown
+                    renderFilteredExams();
+                }
+            }
+        });
+        
+        document.body.addEventListener('submit', (e) => {
+            if (e.target.id === 'add-exam-form') {
+                handleAddExamSubmit(e);
+            }
+        });
+        
+        // Scroll to top button logic
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollToTopBtn.classList.remove('hidden');
+            } else {
+                scrollToTopBtn.classList.add('hidden');
+            }
+        });
+        scrollToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // --- Initialization ---
+        const initializeAppAndData = () => {
+            // Load exams: check local storage first, then use prepopulated data as fallback.
+            const storedExams = getFromLocalStorage('exams', null);
+            if (storedExams && storedExams.length > 0) {
+                exams = storedExams;
+            } else {
+                exams = getPrepopulatedExams();
+                saveToLocalStorage('exams', exams);
+            }
+            
+            // Sort exams by creation date
+            exams.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            // Load saved exams from local storage
+            savedExams = getFromLocalStorage('savedExams', []);
+
+            // Once data is loaded, show the app
+            loadingSpinner.style.display = 'none';
+            mainApp.classList.remove('hidden-until-ready');
+            renderApp();
+        };
+
+        // Start the application on window load
+        window.onload = initializeAppAndData;
+
+    </script>
+</body>
+</html>
